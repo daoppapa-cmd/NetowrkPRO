@@ -70,7 +70,8 @@
             X,
             Smartphone,
             Laptop,
-            Menu
+            Menu,
+            Table2
         } from 'lucide-react';
 
         // --- Firebase Configuration ---
@@ -335,11 +336,13 @@
                                             <div className="flex-1">
                                                 <div className="flex flex-wrap gap-2">
                                                     {sw.accessType === 'Computer' ? (
-                                                        <div className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg border border-blue-100">
+                                                        <div className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg border border-blue-100 w-full md:w-auto">
                                                             <Monitor size={14} />
                                                             <div className="flex flex-col leading-none">
                                                                 <span className="text-[10px] opacity-70">Computer</span>
-                                                                <span className="text-xs font-bold">{sw.computerCount} Units</span>
+                                                                <span className="text-xs font-bold">
+                                                                    {sw.computerRow ? `Row ${sw.computerRow}${sw.computerSection} (PC1-${sw.computerCount})` : `${sw.computerCount} Units`}
+                                                                </span>
                                                             </div>
                                                         </div>
                                                     ) : (
@@ -394,7 +397,13 @@
             const [sName, setSName] = useState('');
             const [sSn, setSSn] = useState('');
             const [sType, setSType] = useState('Computer');
+            
+            // Computer Specific State
             const [cCount, setCCount] = useState('');
+            const [cRow, setCRow] = useState('');
+            const [cSection, setCSection] = useState('A');
+
+            // AP Specific State
             const [apCount, setApCount] = useState('');
             const [apName, setApName] = useState('');
             const [apLoc, setApLoc] = useState('');
@@ -417,11 +426,17 @@
                 setLoading(true);
                 try {
                     const payload = { name: sName, serialNumber: sSn, accessType: sType, createdAt: Date.now() };
-                    if(sType === 'Computer') payload.computerCount = cCount;
+                    if(sType === 'Computer') {
+                        payload.computerCount = cCount;
+                        payload.computerRow = cRow;
+                        payload.computerSection = cSection;
+                    }
                     else { payload.apCount = apCount; payload.apName = apName; payload.apLocation = apLoc; }
                     
                     await set(push(ref(db, `network_structure/routers/${sRouter}/switches`)), payload);
-                    setSName(''); setSSn(''); setCCount(''); setApCount(''); setApName(''); setApLoc('');
+                    setSName(''); setSSn(''); 
+                    setCCount(''); setCRow(''); setCSection('A');
+                    setApCount(''); setApName(''); setApLoc('');
                     onSuccess();
                 } catch(e) { alert(e); }
                 setLoading(false);
@@ -499,9 +514,35 @@
 
                                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                                     {sType === 'Computer' ? (
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-500 uppercase">ចំនួន Computer</label>
-                                            <input type="number" value={cCount} onChange={e => setCCount(e.target.value)} className="w-full mt-2 p-3 bg-white border border-slate-200 rounded-xl outline-none" placeholder="0" />
+                                        <div className="space-y-3">
+                                            <div className="grid grid-cols-2 gap-3">
+                                                 <div>
+                                                    <label className="text-xs font-bold text-slate-500 uppercase">លេខតុ (Row)</label>
+                                                    <div className="relative mt-1">
+                                                        <Table2 size={16} className="absolute left-3 top-2.5 text-slate-400" />
+                                                        <input type="number" value={cRow} onChange={e => setCRow(e.target.value)} className="w-full pl-9 p-2 bg-white border border-slate-200 rounded-lg outline-none" placeholder="1" />
+                                                    </div>
+                                                 </div>
+                                                 <div>
+                                                    <label className="text-xs font-bold text-slate-500 uppercase">ផ្នែក (Section)</label>
+                                                    <select value={cSection} onChange={e => setCSection(e.target.value)} className="w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg outline-none">
+                                                        <option value="A">A</option>
+                                                        <option value="B">B</option>
+                                                    </select>
+                                                 </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase">ចំនួន Computer</label>
+                                                <input type="number" value={cCount} onChange={e => setCCount(e.target.value)} className="w-full mt-2 p-3 bg-white border border-slate-200 rounded-xl outline-none" placeholder="6" />
+                                            </div>
+                                            {(cRow && cCount) && (
+                                                <div className="text-xs text-blue-600 bg-blue-50 p-3 rounded-lg border border-blue-100 flex gap-2 items-start">
+                                                    <Monitor size={14} className="mt-0.5 shrink-0" />
+                                                    <span>
+                                                        <strong>គំរូឈ្មោះ:</strong> PC1Row{cRow}{cSection} ... PC{cCount}Row{cRow}{cSection}
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
                                     ) : (
                                         <div className="space-y-3">
