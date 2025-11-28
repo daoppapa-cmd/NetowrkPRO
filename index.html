@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Process Manager</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Babel for JSX transformation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Font for Khmer Language (Battambang) -->
+    <link href="https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Battambang', sans-serif; }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+    
+    <!-- Import Map to handle module imports -->
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js",
+        "firebase/database": "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js",
+        "lucide-react": "https://esm.sh/lucide-react@0.378.0"
+      }
+    }
+    </script>
+</head>
+<body class="bg-slate-100 text-slate-800 h-screen overflow-hidden">
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import { initializeApp } from 'firebase/app';
+        import { 
+            getDatabase, 
+            ref, 
+            push, 
+            onValue, 
+            remove, 
+            set 
+        } from 'firebase/database';
+        import { 
+            Router as RouterIcon, 
+            Server, 
+            Wifi, 
+            Monitor, 
+            Trash2, 
+            Save, 
+            Activity, 
+            Network,
+            MapPin,    
+            Plus,
+            ChevronRight,
+            ChevronDown,
+            LayoutDashboard,
+            PlusCircle,
+            ListTree,
+            X,
+            Smartphone,
+            Laptop,
+            Menu
+        } from 'lucide-react';
+
+        // --- Firebase Configuration ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyACYmcbqF1va2ZZc70zQQqjGZiV2hX0mbg",
+            authDomain: "networkpro-a908c.firebaseapp.com",
+            databaseURL: "https://networkpro-a908c-default-rtdb.firebaseio.com",
+            projectId: "networkpro-a908c",
+            storageBucket: "networkpro-a908c.firebasestorage.app",
+            messagingSenderId: "407357564008",
+            appId: "1:407357564008:web:dcaefa798888b6a9a407dd",
+            measurementId: "G-08C31G5ZLS"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // --- Main Component ---
+        function App() {
+            const [activeTab, setActiveTab] = useState('dashboard');
+            const [routers, setRouters] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [stats, setStats] = useState({ routers: 0, switches: 0, computers: 0, aps: 0 });
+
+            // Data Fetching
+            useEffect(() => {
+                const dbRef = ref(db, 'network_structure/routers');
+                const unsubscribe = onValue(dbRef, (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        const loadedRouters = Object.keys(data).map(key => ({
+                            id: key,
+                            ...data[key]
+                        }));
+                        loadedRouters.sort((a, b) => b.createdAt - a.createdAt);
+                        setRouters(loadedRouters);
+
+                        // Calculate Stats
+                        let sCount = 0, cCount = 0, aCount = 0;
+                        loadedRouters.forEach(r => {
+                            if (r.switches) {
+                                Object.values(r.switches).forEach(s => {
+                                    sCount++;
+                                    if (s.accessType === 'Computer') cCount += parseInt(s.computerCount || '0');
+                                    if (s.accessType === 'AP (WIFI)') aCount += parseInt(s.apCount || '0');
+                                });
+                            }
+                        });
+                        setStats({ routers: loadedRouters.length, switches: sCount, computers: cCount, aps: aCount });
+                    } else {
+                        setRouters([]);
+                        setStats({ routers: 0, switches: 0, computers: 0, aps: 0 });
+                    }
+                    setLoading(false);
+                });
+                return () => unsubscribe();
+            }, []);
+
+            return (
+                <div className="flex h-screen bg-slate-100 font-sans text-slate-800 overflow-hidden">
+                    
+                    {/* --- DESKTOP SIDEBAR --- */}
+                    <aside className="hidden md:flex w-64 flex-col bg-slate-900 text-white shadow-xl z-20">
+                        <div className="p-6 flex items-center gap-3 border-b border-slate-800">
+                            <div className="bg-blue-600 p-2 rounded-lg">
+                                <Network size={24} className="text-white" />
+                            </div>
+                            <div>
+                                <h1 className="font-bold text-lg tracking-wide">NetManager</h1>
+                                <p className="text-xs text-slate-400">Pro Edition</p>
+                            </div>
+                        </div>
+                        
+                        <nav className="flex-1 p-4 space-y-2">
+                            <SidebarItem 
+                                icon={<LayoutDashboard size={20} />} 
+                                label="ផ្ទាំងគ្រប់គ្រង" 
+                                active={activeTab === 'dashboard'} 
+                                onClick={() => setActiveTab('dashboard')} 
+                            />
+                            <SidebarItem 
+                                icon={<ListTree size={20} />} 
+                                label="បណ្តាញ Network" 
+                                active={activeTab === 'list'} 
+                                onClick={() => setActiveTab('list')} 
+                            />
+                            <SidebarItem 
+                                icon={<PlusCircle size={20} />} 
+                                label="បន្ថែមឧបករណ៍" 
+                                active={activeTab === 'add'} 
+                                onClick={() => setActiveTab('add')} 
+                            />
+                        </nav>
+
+                        <div className="p-4 border-t border-slate-800">
+                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                                <Activity size={12} className={loading ? "text-yellow-500 animate-pulse" : "text-green-500"} />
+                                {loading ? 'Syncing...' : 'System Online'}
+                            </div>
+                        </div>
+                    </aside>
+
+                    {/* --- MAIN CONTENT AREA --- */}
+                    <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+                        
+                        {/* Mobile Header */}
+                        <header className="md:hidden bg-slate-900 text-white p-4 flex justify-between items-center shadow-md z-20">
+                            <div className="flex items-center gap-2">
+                                <Network size={20} className="text-blue-400" />
+                                <span className="font-bold">NetManager</span>
+                            </div>
+                            <div className="text-xs px-2 py-1 bg-slate-800 rounded-full flex items-center gap-1">
+                                <Activity size={10} className={loading ? "text-yellow-400" : "text-green-400"} />
+                                {loading ? 'Sync' : 'Live'}
+                            </div>
+                        </header>
+
+                        {/* Content Scrollable */}
+                        <main className="flex-1 overflow-y-auto p-4 pb-24 md:p-8 md:pb-8 scroll-smooth">
+                            <div className="max-w-5xl mx-auto">
+                                {activeTab === 'dashboard' && <DashboardView stats={stats} routers={routers} />}
+                                {activeTab === 'list' && <ListView routers={routers} db={db} />}
+                                {activeTab === 'add' && <AddView routers={routers} db={db} onSuccess={() => setActiveTab('list')} />}
+                            </div>
+                        </main>
+
+                        {/* --- MOBILE BOTTOM NAVIGATION --- */}
+                        <div className="md:hidden absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-6 py-3 flex justify-between items-center z-30 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+                            <MobileNavItem 
+                                icon={<LayoutDashboard size={24} />} 
+                                label="Home" 
+                                active={activeTab === 'dashboard'} 
+                                onClick={() => setActiveTab('dashboard')} 
+                            />
+                            <div className="-mt-8">
+                                <button 
+                                    onClick={() => setActiveTab('add')}
+                                    className={`p-4 rounded-full shadow-lg transition-all ${activeTab === 'add' ? 'bg-blue-600 ring-4 ring-blue-100' : 'bg-slate-900'}`}
+                                >
+                                    <Plus size={24} className="text-white" />
+                                </button>
+                            </div>
+                            <MobileNavItem 
+                                icon={<ListTree size={24} />} 
+                                label="Network" 
+                                active={activeTab === 'list'} 
+                                onClick={() => setActiveTab('list')} 
+                            />
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- SUB COMPONENTS ---
+
+        const DashboardView = ({ stats, routers }) => (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div>
+                    <h2 className="text-2xl font-bold text-slate-800">សង្ខេបពត៌មាន (Dashboard)</h2>
+                    <p className="text-slate-500">ស្ថានភាពបណ្តាញទូទៅ</p>
+                </div>
+
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <StatCard title="Routers" value={stats.routers} icon={<RouterIcon className="text-blue-500" />} color="bg-blue-50 border-blue-100" />
+                    <StatCard title="Switches" value={stats.switches} icon={<Server className="text-indigo-500" />} color="bg-indigo-50 border-indigo-100" />
+                    <StatCard title="Computers" value={stats.computers} icon={<Monitor className="text-emerald-500" />} color="bg-emerald-50 border-emerald-100" />
+                    <StatCard title="APs" value={stats.aps} icon={<Wifi className="text-purple-500" />} color="bg-purple-50 border-purple-100" />
+                </div>
+
+                {/* Recent Activity */}
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                    <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
+                        <Activity size={18} className="text-slate-400" />
+                        Router ថ្មីៗ
+                    </h3>
+                    <div className="space-y-3">
+                        {routers.slice(0, 3).map(r => (
+                            <div key={r.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-white p-2 rounded-lg shadow-sm">
+                                        <RouterIcon size={20} className="text-blue-600" />
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-sm text-slate-700">{r.aid}</p>
+                                        <p className="text-xs text-slate-400">{r.switches ? Object.keys(r.switches).length : 0} Switches connected</p>
+                                    </div>
+                                </div>
+                                <span className="text-xs font-mono text-slate-400">{new Date(r.createdAt).toLocaleDateString()}</span>
+                            </div>
+                        ))}
+                        {routers.length === 0 && <p className="text-center text-slate-400 py-4">មិនទាន់មានទិន្នន័យ</p>}
+                    </div>
+                </div>
+            </div>
+        );
+
+        const ListView = ({ routers, db }) => {
+            const deleteRouter = async (id) => {
+                if (confirm("តើអ្នកចង់លុប Router នេះ និង Switch ទាំងអស់ក្នុងនោះដែរឬទេ?")) {
+                    await remove(ref(db, `network_structure/routers/${id}`));
+                }
+            };
+
+            const deleteSwitch = async (routerId, switchId) => {
+                if (confirm("តើអ្នកចង់លុប Switch នេះទេ?")) {
+                    await remove(ref(db, `network_structure/routers/${routerId}/switches/${switchId}`));
+                }
+            };
+
+            return (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="flex justify-between items-end">
+                        <div>
+                            <h2 className="text-2xl font-bold text-slate-800">រចនាសម្ព័ន្ធបណ្តាញ (Topology)</h2>
+                            <p className="text-slate-500">បញ្ជីឧបករណ៍លម្អិត</p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        {routers.map(router => (
+                            <div key={router.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                {/* Router Header */}
+                                <div className="bg-slate-50/80 p-4 flex justify-between items-center border-b border-slate-100">
+                                    <div className="flex items-center gap-3">
+                                        <div className="bg-blue-600 text-white p-2.5 rounded-xl shadow-blue-200 shadow-md">
+                                            <RouterIcon size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-slate-800">{router.aid}</h3>
+                                            <div className="flex items-center gap-2 text-xs text-slate-500">
+                                                <span className="bg-slate-200 px-2 py-0.5 rounded text-slate-600 font-mono text-[10px]">ROUTER</span>
+                                                <span>•</span>
+                                                <span>{router.switches ? Object.keys(router.switches).length : 0} Switches</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => deleteRouter(router.id)} className="text-slate-300 hover:text-red-500 p-2 transition-colors">
+                                        <Trash2 size={18} />
+                                    </button>
+                                </div>
+
+                                {/* Switches List */}
+                                <div className="divide-y divide-slate-50">
+                                    {router.switches ? Object.entries(router.switches).map(([sid, sw]) => (
+                                        <div key={sid} className="p-4 flex flex-col md:flex-row md:items-center gap-4 hover:bg-slate-50 transition-colors">
+                                            <div className="flex items-center gap-3 md:w-1/4">
+                                                <div className="text-slate-300">
+                                                    <ChevronRight size={16} />
+                                                </div>
+                                                <div className="bg-indigo-50 text-indigo-600 p-2 rounded-lg">
+                                                    <Server size={18} />
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-sm text-slate-700">{sw.name}</p>
+                                                    <p className="text-[10px] text-slate-400 font-mono">SN: {sw.serialNumber}</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex-1">
+                                                <div className="flex flex-wrap gap-2">
+                                                    {sw.accessType === 'Computer' ? (
+                                                        <div className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg border border-blue-100">
+                                                            <Monitor size={14} />
+                                                            <div className="flex flex-col leading-none">
+                                                                <span className="text-[10px] opacity-70">Computer</span>
+                                                                <span className="text-xs font-bold">{sw.computerCount} Units</span>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center gap-2 bg-purple-50 text-purple-700 px-3 py-1.5 rounded-lg border border-purple-100 w-full md:w-auto">
+                                                            <Wifi size={14} />
+                                                            <div className="flex flex-col leading-none">
+                                                                <span className="text-[10px] opacity-70">Access Point</span>
+                                                                <span className="text-xs font-bold">{sw.apName} ({sw.apCount})</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {sw.apLocation && (
+                                                        <div className="flex items-center gap-1 text-xs text-slate-500 px-2">
+                                                            <MapPin size={12} /> {sw.apLocation}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex justify-end">
+                                                <button onClick={() => deleteSwitch(router.id, sid)} className="text-slate-300 hover:text-red-500 p-1.5 rounded">
+                                                    <X size={16} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )) : (
+                                        <div className="p-4 text-center text-sm text-slate-400 italic">No switches connected</div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                        {routers.length === 0 && (
+                            <div className="text-center py-12 text-slate-400">
+                                <LayoutDashboard size={48} className="mx-auto mb-3 opacity-20" />
+                                <p>មិនមានទិន្នន័យនៅក្នុងប្រព័ន្ធ</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const AddView = ({ routers, db, onSuccess }) => {
+            const [mode, setMode] = useState('switch');
+            const [loading, setLoading] = useState(false);
+
+            // Router State
+            const [rName, setRName] = useState('');
+
+            // Switch State
+            const [sRouter, setSRouter] = useState('');
+            const [sName, setSName] = useState('');
+            const [sSn, setSSn] = useState('');
+            const [sType, setSType] = useState('Computer');
+            const [cCount, setCCount] = useState('');
+            const [apCount, setApCount] = useState('');
+            const [apName, setApName] = useState('');
+            const [apLoc, setApLoc] = useState('');
+
+            const submitRouter = async (e) => {
+                e.preventDefault();
+                if(!rName) return;
+                setLoading(true);
+                try {
+                    await set(push(ref(db, 'network_structure/routers')), { aid: rName, createdAt: Date.now() });
+                    setRName('');
+                    alert("បង្កើត Router ជោគជ័យ!");
+                } catch(e) { alert(e); }
+                setLoading(false);
+            };
+
+            const submitSwitch = async (e) => {
+                e.preventDefault();
+                if(!sRouter || !sName) return;
+                setLoading(true);
+                try {
+                    const payload = { name: sName, serialNumber: sSn, accessType: sType, createdAt: Date.now() };
+                    if(sType === 'Computer') payload.computerCount = cCount;
+                    else { payload.apCount = apCount; payload.apName = apName; payload.apLocation = apLoc; }
+                    
+                    await set(push(ref(db, `network_structure/routers/${sRouter}/switches`)), payload);
+                    setSName(''); setSSn(''); setCCount(''); setApCount(''); setApName(''); setApLoc('');
+                    onSuccess();
+                } catch(e) { alert(e); }
+                setLoading(false);
+            };
+
+            return (
+                <div className="max-w-xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="text-center mb-8">
+                        <h2 className="text-2xl font-bold text-slate-800">បន្ថែមឧបករណ៍</h2>
+                        <p className="text-slate-500">ពង្រីកហេដ្ឋារចនាសម្ព័ន្ធបណ្តាញ</p>
+                    </div>
+
+                    {/* Toggle Type */}
+                    <div className="bg-slate-200 p-1 rounded-xl flex mb-8">
+                        <button 
+                            onClick={() => setMode('router')}
+                            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${mode === 'router' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}
+                        >
+                            New Router
+                        </button>
+                        <button 
+                            onClick={() => setMode('switch')}
+                            className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${mode === 'switch' ? 'bg-white shadow text-blue-600' : 'text-slate-500'}`}
+                        >
+                            New Switch
+                        </button>
+                    </div>
+
+                    <div className="bg-white rounded-2xl shadow-lg border border-slate-100 p-6 md:p-8">
+                        {mode === 'router' ? (
+                            <form onSubmit={submitRouter} className="space-y-6">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase">Mikrotik AID</label>
+                                    <input value={rName} onChange={e => setRName(e.target.value)} className="w-full mt-2 p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="MK-01" />
+                                </div>
+                                <button disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-200">
+                                    {loading ? 'Creating...' : 'បង្កើត Router'}
+                                </button>
+                            </form>
+                        ) : (
+                            <form onSubmit={submitSwitch} className="space-y-5">
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase">ជ្រើសរើស Router</label>
+                                    <div className="relative mt-2">
+                                        <select value={sRouter} onChange={e => setSRouter(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl appearance-none outline-none focus:ring-2 focus:ring-blue-500">
+                                            <option value="">-- សូមជ្រើសរើស --</option>
+                                            {routers.map(r => <option key={r.id} value={r.id}>{r.aid}</option>)}
+                                        </select>
+                                        <ChevronDown className="absolute right-4 top-3.5 text-slate-400 pointer-events-none" size={16} />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase">ឈ្មោះ Switch</label>
+                                        <input value={sName} onChange={e => setSName(e.target.value)} className="w-full mt-2 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" placeholder="SW-01" />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase">Serial No.</label>
+                                        <input value={sSn} onChange={e => setSSn(e.target.value)} className="w-full mt-2 p-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500" placeholder="SN..." />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">ប្រភេទនៃការតភ្ជាប់</label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div onClick={() => setSType('Computer')} className={`p-3 rounded-xl border-2 cursor-pointer transition-all flex flex-col items-center gap-2 ${sType === 'Computer' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-100'}`}>
+                                            <Monitor size={20} /> <span className="text-xs font-bold">Computer</span>
+                                        </div>
+                                        <div onClick={() => setSType('AP (WIFI)')} className={`p-3 rounded-xl border-2 cursor-pointer transition-all flex flex-col items-center gap-2 ${sType === 'AP (WIFI)' ? 'border-purple-500 bg-purple-50 text-purple-700' : 'border-slate-100'}`}>
+                                            <Wifi size={20} /> <span className="text-xs font-bold">AP (Wifi)</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                    {sType === 'Computer' ? (
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase">ចំនួន Computer</label>
+                                            <input type="number" value={cCount} onChange={e => setCCount(e.target.value)} className="w-full mt-2 p-3 bg-white border border-slate-200 rounded-xl outline-none" placeholder="0" />
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="text-xs font-bold text-slate-500 uppercase">ចំនួន AP</label>
+                                                    <input type="number" value={apCount} onChange={e => setApCount(e.target.value)} className="w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg outline-none" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs font-bold text-slate-500 uppercase">ឈ្មោះ SSID</label>
+                                                    <input value={apName} onChange={e => setApName(e.target.value)} className="w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg outline-none" />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase">ទីតាំង</label>
+                                                <input value={apLoc} onChange={e => setApLoc(e.target.value)} className="w-full mt-1 p-2 bg-white border border-slate-200 rounded-lg outline-none" placeholder="e.g. ជាន់ទី 1" />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <button disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-indigo-200">
+                                    {loading ? 'Saving...' : 'រក្សាទុក Switch'}
+                                </button>
+                            </form>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const SidebarItem = ({ icon, label, active, onClick }) => (
+            <button 
+                onClick={onClick}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${active ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+            >
+                {icon}
+                <span className="font-medium text-sm">{label}</span>
+            </button>
+        );
+
+        const MobileNavItem = ({ icon, label, active, onClick }) => (
+            <button onClick={onClick} className={`flex flex-col items-center gap-1 ${active ? 'text-blue-600' : 'text-slate-400'}`}>
+                {icon}
+                <span className="text-[10px] font-medium">{label}</span>
+            </button>
+        );
+
+        const StatCard = ({ title, value, icon, color }) => (
+            <div className={`p-4 rounded-2xl border ${color} flex flex-col items-center justify-center text-center shadow-sm`}>
+                <div className="mb-2 bg-white p-2 rounded-full shadow-sm">{icon}</div>
+                <span className="text-2xl font-bold text-slate-800">{value}</span>
+                <span className="text-xs text-slate-500 uppercase tracking-wider">{title}</span>
+            </div>
+        );
+
+        // Render App
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
